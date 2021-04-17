@@ -1,17 +1,19 @@
 package de.kcodeyt.headsdb.database;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 
 import java.util.List;
 
 @Getter
-@AllArgsConstructor
+@ToString
+@RequiredArgsConstructor
 class Category {
 
-    private final Categories categories;
+    private final CategoryEnum categoryEnum;
     private final String displayName;
     private final String displaySkin;
-    private final List<DBSkin> skins;
+    private final List<HeadEntry> entries;
 
 }

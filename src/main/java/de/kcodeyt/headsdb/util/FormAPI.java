@@ -6,26 +6,21 @@ import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerFormRespondedEvent;
 import cn.nukkit.event.player.PlayerQuitEvent;
 import cn.nukkit.form.window.FormWindow;
-import cn.nukkit.plugin.Plugin;
-import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.scheduler.TaskHandler;
-import de.kcodeyt.headsdb.HeadsDB;
 
 import java.lang.reflect.Field;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
 public class FormAPI {
 
     private static final Map<FormWindow, Handler> HANDLERS = new HashMap<>();
-    private static final FormListener FORM_LISTENER = new FormListener();
 
     public static void create(Player player, FormWindow formWindow, Runnable onResponse) {
         new Handler(player, formWindow, onResponse);
     }
 
     public static class FormListener implements Listener {
-
-        private HeadsDB headsDB;
 
         @EventHandler
         public void onForm(PlayerFormRespondedEvent event) {
@@ -51,19 +46,6 @@ public class FormAPI {
                 handler.handle(isQuit);
         }
 
-        private boolean register(Player player) {
-            if(this.headsDB != null)
-                return true;
-            final PluginManager pluginManager = player.getServer().getPluginManager();
-            for(final Plugin plugin : pluginManager.getPlugins().values()) {
-                if(plugin instanceof HeadsDB) {
-                    pluginManager.registerEvents(this, this.headsDB = (HeadsDB) plugin);
-                    return true;
-                }
-            }
-            return false;
-        }
-
     }
 
     private static class Handler {
@@ -73,14 +55,9 @@ public class FormAPI {
 
         private Handler(Player player, FormWindow formWindow, Runnable runnable) {
             this.runnable = runnable;
-            if(FORM_LISTENER.register(player)) {
-                HANDLERS.put(formWindow, this);
-                player.showFormWindow(formWindow);
-                this.taskHandler = player.getServer().getScheduler().scheduleDelayedRepeatingTask(FORM_LISTENER.headsDB, player::sendExperience, 3, 3);
-                return;
-            }
-
-            this.taskHandler = null;
+            player.showFormWindow(formWindow);
+            this.taskHandler = player.getServer().getScheduler().scheduleDelayedRepeatingTask(null, player::sendExperience, 3, 3);
+            HANDLERS.put(formWindow, this);
         }
 
         private void handle(boolean isQuit) {

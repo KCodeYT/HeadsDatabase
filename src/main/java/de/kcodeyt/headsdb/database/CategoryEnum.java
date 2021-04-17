@@ -5,7 +5,7 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum Categories {
+public enum CategoryEnum {
 
     ALPHABET("Alphabet", "alphabet"),
     ANIMALS("Animals", "animals"),

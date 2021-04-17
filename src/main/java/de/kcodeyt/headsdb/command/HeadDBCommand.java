@@ -6,7 +6,7 @@ import cn.nukkit.command.CommandSender;
 import cn.nukkit.form.element.ElementSlider;
 import cn.nukkit.form.window.FormWindowCustom;
 import de.kcodeyt.headsdb.HeadsDB;
-import de.kcodeyt.headsdb.database.DBSkin;
+import de.kcodeyt.headsdb.database.HeadEntry;
 import de.kcodeyt.headsdb.util.FormAPI;
 
 import java.util.List;
@@ -53,10 +53,10 @@ public class HeadDBCommand extends Command {
                             amount = 1;
                         }
 
-                        final List<DBSkin> dbSkins = this.headsDB.getDatabase().getDbSkins();
+                        final List<HeadEntry> headEntries = this.headsDB.getDatabase().getHeadEntries();
                         final Random random = ThreadLocalRandom.current();
                         for(int i = 0; i < amount; i++)
-                            this.headsDB.getDatabase().giveItem((Player) sender, dbSkins.get(random.nextInt(dbSkins.size())));
+                            this.headsDB.getDatabase().giveItem((Player) sender, headEntries.get(random.nextInt(headEntries.size())));
                         return true;
                     }
                     break;
