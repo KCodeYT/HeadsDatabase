@@ -20,6 +20,7 @@ import java.io.Reader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Getter
 public class Database {
@@ -53,7 +54,8 @@ public class Database {
                 if(connection.getResponseCode() == 200) {
                     try(final InputStream inputStream = connection.getInputStream();
                         final Reader reader = new InputStreamReader(inputStream)) {
-                        final List<HeadEntry> headEntries = GSON.<List<HeadEntry>>fromJson(reader, List.class);
+                        final List<Map<String, String>> values = GSON.<List<Map<String, String>>>fromJson(reader, List.class);
+                        final List<HeadEntry> headEntries = values.stream().map(map -> new HeadEntry(map.get("name"), map.get("uuid"), map.get("value"))).collect(Collectors.toList());
                         this.headEntries.addAll(headEntries);
                         this.categories.add(new Category(category, category.getDisplayName(), Iterables.getLast(headEntries).getTexture(), Collections.unmodifiableList(headEntries)));
                     }

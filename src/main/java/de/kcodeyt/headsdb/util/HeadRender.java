@@ -7,10 +7,9 @@ import de.kcodeyt.heads.util.api.SkinAPI;
 public class HeadRender {
 
     private static final String URL = "https://mc-heads.net/head/";
-    private static final int SIZE = 256;
 
     private static String createUrl(String texture) {
-        return URL + SkinAPI.fromBase64(texture).substring(Mojang.TEXTURES.length()) + "/" + SIZE;
+        return URL + SkinAPI.fromBase64(texture).substring(Mojang.TEXTURES.length()) + ".png";
     }
 
     public static ElementButtonImageData createButtonImage(String texture) {

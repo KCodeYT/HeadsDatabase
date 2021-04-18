@@ -1,16 +1,20 @@
 package de.kcodeyt.headsdb.util;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerFormRespondedEvent;
 import cn.nukkit.event.player.PlayerQuitEvent;
 import cn.nukkit.form.window.FormWindow;
+import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.scheduler.TaskHandler;
+import de.kcodeyt.headsdb.HeadsDB;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class FormAPI {
 
@@ -21,6 +25,8 @@ public class FormAPI {
     }
 
     public static class FormListener implements Listener {
+
+        private static final AtomicBoolean INITIATED = new AtomicBoolean(false);
 
         @EventHandler
         public void onForm(PlayerFormRespondedEvent event) {
@@ -54,10 +60,21 @@ public class FormAPI {
         private final TaskHandler taskHandler;
 
         private Handler(Player player, FormWindow formWindow, Runnable runnable) {
+            final Server server = player.getServer();
             this.runnable = runnable;
+            this.taskHandler = server.getScheduler().scheduleDelayedRepeatingTask(null, player::sendExperience, 3, 3);
+
             player.showFormWindow(formWindow);
-            this.taskHandler = player.getServer().getScheduler().scheduleDelayedRepeatingTask(null, player::sendExperience, 3, 3);
             HANDLERS.put(formWindow, this);
+            if(!FormListener.INITIATED.get()) {
+                FormListener.INITIATED.set(true);
+                final PluginManager pluginManager = server.getPluginManager();
+                pluginManager.registerEvents(new FormListener(),
+                        pluginManager.getPlugins().values().stream().
+                                filter(plugin -> plugin instanceof HeadsDB).
+                                findAny().
+                                orElseThrow(RuntimeException::new));
+            }
         }
 
         private void handle(boolean isQuit) {

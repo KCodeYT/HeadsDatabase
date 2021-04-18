@@ -1,16 +1,16 @@
 package de.kcodeyt.headsdb.database;
 
 import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 
 @Getter
 @ToString
-@NoArgsConstructor
+@RequiredArgsConstructor
 public class HeadEntry {
 
-    private final String name = null;
-    private final String id = null;
-    private final String texture = null;
+    private final String name;
+    private final String id;
+    private final String texture;
 
 }
