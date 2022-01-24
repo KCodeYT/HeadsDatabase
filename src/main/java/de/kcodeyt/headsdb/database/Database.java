@@ -1,25 +1,30 @@
 package de.kcodeyt.headsdb.database;
 
 import cn.nukkit.Player;
-import cn.nukkit.Server;
 import cn.nukkit.form.element.ElementButton;
+import cn.nukkit.form.element.ElementInput;
+import cn.nukkit.form.window.FormWindow;
+import cn.nukkit.form.window.FormWindowCustom;
 import cn.nukkit.form.window.FormWindowSimple;
 import cn.nukkit.item.Item;
+import cn.nukkit.utils.TextFormat;
 import com.google.common.collect.Iterables;
 import com.google.gson.Gson;
 import de.kcodeyt.heads.Heads;
 import de.kcodeyt.heads.util.HeadInput;
+import de.kcodeyt.heads.util.ScheduledFuture;
+import de.kcodeyt.headsdb.HeadsDB;
 import de.kcodeyt.headsdb.util.FormAPI;
 import de.kcodeyt.headsdb.util.HeadRender;
 import lombok.Getter;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 @Getter
@@ -31,6 +36,7 @@ public class Database {
     private final Map<String, Integer> pageCount;
     private final List<Category> categories;
     private final List<HeadEntry> headEntries;
+    private ScheduledFuture<Boolean> loadFuture;
 
     public Database() {
         this.pageCount = new HashMap<>();
@@ -38,89 +44,221 @@ public class Database {
         this.headEntries = new ArrayList<>();
     }
 
-    public boolean reload() {
-        this.categories.clear();
-        this.headEntries.clear();
-        return this.load();
+    public ScheduledFuture<Boolean> reload() {
+        if(this.loadFuture != null)
+            return this.loadFuture;
+        return this.load(true);
     }
 
-    public boolean load() {
-        try {
-            for(final CategoryEnum category : CategoryEnum.values()) {
-                final HttpURLConnection connection = (HttpURLConnection) new URL(API_URL + "?cat=" + category.getIdentifier()).openConnection();
-                connection.setRequestProperty("User-Agent", "Chrome");
-                connection.connect();
+    public ScheduledFuture<Boolean> load() {
+        return this.load(false);
+    }
 
-                if(connection.getResponseCode() == 200) {
-                    try(final InputStream inputStream = connection.getInputStream();
-                        final Reader reader = new InputStreamReader(inputStream)) {
-                        final List<Map<String, String>> values = GSON.<List<Map<String, String>>>fromJson(reader, List.class);
-                        final List<HeadEntry> headEntries = values.stream().map(map -> new HeadEntry(map.get("name"), map.get("uuid"), map.get("value"))).collect(Collectors.toList());
-                        this.headEntries.addAll(headEntries);
-                        this.categories.add(new Category(category, category.getDisplayName(), Iterables.getLast(headEntries).getTexture(), Collections.unmodifiableList(headEntries)));
+    private ScheduledFuture<Boolean> load(boolean clear) {
+        if(this.loadFuture != null)
+            return this.loadFuture;
+        final List<HeadEntry> localHeadEntries = new ArrayList<>();
+        final List<Category> localCategories = new ArrayList<>();
+        return this.loadFuture = ScheduledFuture.supplyAsync(() -> {
+            try {
+                for(final CategoryEnum category : CategoryEnum.values()) {
+                    final HttpURLConnection connection = (HttpURLConnection) new URL(API_URL + "?cat=" + category.getIdentifier() + "&tags=true").openConnection();
+                    connection.setRequestProperty("User-Agent", "Chrome");
+                    connection.connect();
+
+                    if(connection.getResponseCode() == 200) {
+                        try(final InputStream inputStream = connection.getInputStream();
+                            final Reader reader = new InputStreamReader(inputStream)) {
+                            final List<Map<String, String>> values = GSON.<List<Map<String, String>>>fromJson(reader, List.class);
+                            final List<HeadEntry> headEntries = values.stream().
+                                    map(map -> new HeadEntry(map.get("name"), map.get("uuid"), map.get("value"), map.get("tags"))).
+                                    sorted(Comparator.comparing(HeadEntry::getName)).
+                                    collect(Collectors.toList());
+                            localHeadEntries.addAll(headEntries);
+                            localCategories.add(new Category(category, category.getDisplayName(), Iterables.getLast(headEntries).getTexture(), Collections.unmodifiableList(headEntries)));
+                        }
                     }
+
+                    connection.disconnect();
                 }
 
-                connection.disconnect();
+                return true;
+            } catch(Exception e) {
+                throw new CompletionException(e);
             }
+        }).whenComplete((result, error) -> {
+            this.loadFuture = null;
+            if(result) {
+                if(clear) {
+                    this.categories.clear();
+                    this.headEntries.clear();
+                }
 
-            return true;
-        } catch(IOException e) {
-            Server.getInstance().getLogger().error("Error whilst loading heads from database api!", e);
-            e.printStackTrace();
-            return false;
-        }
+                this.headEntries.addAll(localHeadEntries);
+                this.categories.addAll(localCategories);
+            }
+        });
     }
 
-    private List<List<HeadEntry>> toPages(Category category, int count) {
-        final List<HeadEntry> headEntries = category.getEntries();
-        final int dbSize = headEntries.size();
+    private <T> List<List<T>> toPages(List<T> entries, int count) {
+        final int dbSize = entries.size();
         if(dbSize <= 0)
             return Collections.emptyList();
-        final List<List<HeadEntry>> pages = new ArrayList<>();
+        final List<List<T>> pages = new ArrayList<>();
         final int chunks = (dbSize - 1) / count;
         for(int i = 0; i <= chunks; i++)
-            pages.add(headEntries.subList(i * count, i == chunks ? dbSize : (i + 1) * count));
+            pages.add(entries.subList(i * count, i == chunks ? dbSize : (i + 1) * count));
         return Collections.unmodifiableList(pages);
     }
 
     public void showForm(Player player) {
-        final FormWindowSimple categoriesForm = new FormWindowSimple("Select a category", "");
+        final FormWindowSimple categoriesForm = new FormWindowSimple("§lSelect a category", "");
         final List<Category> categories = Collections.unmodifiableList(new ArrayList<>(this.categories));
+        categoriesForm.addButton(new ElementButton("Search a head", HeadRender.createButtonImageById(HeadsDB.MHF_QUESTION_TEXTURE_ID)));
         for(final Category category : categories)
             categoriesForm.addButton(new ElementButton(category.getDisplayName(), HeadRender.createButtonImage(category.getDisplaySkin())));
         FormAPI.create(player, categoriesForm, () -> {
             if(categoriesForm.wasClosed())
                 return;
-            final Category category = categories.get(categoriesForm.getResponse().getClickedButtonId());
-            if(category == null)
-                return;
-            final FormWindowSimple pagesForm = new FormWindowSimple("Select a page", "");
-            final List<List<HeadEntry>> pages = this.toPages(category, this.pageCount.getOrDefault(player.getName(), 40));
+
+            if(categoriesForm.getResponse().getClickedButtonId() == 0) {
+                final FormWindowCustom searchForm = new FormWindowCustom("§lSearch a head");
+                searchForm.addElement(new ElementInput("Search head..."));
+                FormAPI.create(player, searchForm, () -> {
+                    if(searchForm.wasClosed()) {
+                        FormAPI.createLast(player, categoriesForm);
+                        return;
+                    }
+
+                    final String searchInput = TextFormat.clean(Objects.toString(searchForm.getResponse().getInputResponse(0), "")).trim();
+                    if(searchInput.isEmpty()) {
+                        player.sendMessage("§cCould not search with empty search input!");
+                        return;
+                    }
+
+                    final String[] searchArgs = Arrays.stream(searchInput.split(",")).
+                            map(String::trim).map(String::toLowerCase).toArray(String[]::new);
+
+                    final List<HeadEntry> foundEntries = new ArrayList<>();
+                    next_head:
+                    for(final HeadEntry headEntry : this.headEntries) {
+                        final String name = headEntry.getName().toLowerCase(Locale.ROOT);
+                        final String[] tags = headEntry.getTags() != null ?
+                                Arrays.stream(headEntry.getTags().split(",")).
+                                        map(String::toLowerCase).toArray(String[]::new) : null;
+
+                        for(final String searchArg : searchArgs) {
+                            if(name.startsWith(searchArg) || name.endsWith(searchArg) || name.contains(searchArg)) {
+                                foundEntries.add(headEntry);
+                                continue next_head;
+                            } else if(tags != null)
+                                for(final String tag : tags) {
+                                    if(tag.startsWith(searchArg) || tag.endsWith(searchArg) || tag.contains(searchArg)) {
+                                        foundEntries.add(headEntry);
+                                        continue next_head;
+                                    }
+                                }
+                        }
+                    }
+
+                    this.showForm(player, searchForm, foundEntries, "§lSearch: " + searchInput);
+                });
+            } else {
+                final Category category = categories.get(categoriesForm.getResponse().getClickedButtonId() - 1);
+                if(category == null)
+                    return;
+                this.showForm(player, categoriesForm, category.getEntries(), "§l" + category.getDisplayName());
+            }
+        });
+    }
+
+    private void showForm(Player player, FormWindow lastWindow, List<HeadEntry> headEntries, String title) {
+        final int pageCount = this.pageCount.getOrDefault(player.getName(), 40);
+        if(headEntries.size() > pageCount * pageCount) {
+            final FormWindowSimple pagesForm = new FormWindowSimple("§lSelect a page", "");
+            final List<List<List<HeadEntry>>> pages = this.toPages(this.toPages(headEntries, pageCount), pageCount);
+            for(int i = 0; i < pages.size(); i++)
+                pagesForm.addButton(new ElementButton("Page " + (i + 1), HeadRender.createButtonImage(Iterables.getLast(Iterables.getLast(pages.get(i))).getTexture())));
+            FormAPI.create(player, pagesForm, () -> {
+                if(pagesForm.wasClosed()) {
+                    FormAPI.createLast(player, lastWindow);
+                    return;
+                }
+
+                final FormWindowSimple subPagesForm = new FormWindowSimple("§lSelect a subpage", "");
+                final List<List<HeadEntry>> subPages = pages.get(pagesForm.getResponse().getClickedButtonId());
+                for(int i = 0; i < subPages.size(); i++)
+                    subPagesForm.addButton(new ElementButton("Subpage " + (i + 1), HeadRender.createButtonImage(Iterables.getLast(subPages.get(i)).getTexture())));
+                FormAPI.create(player, subPagesForm, () -> {
+                    if(subPagesForm.wasClosed()) {
+                        FormAPI.createLast(player, pagesForm);
+                        return;
+                    }
+
+                    final List<HeadEntry> headEntries0 = subPages.get(subPagesForm.getResponse().getClickedButtonId());
+                    if(headEntries0 == null)
+                        return;
+                    final FormWindowSimple subForm = new FormWindowSimple(title, "");
+                    for(final HeadEntry headEntry : headEntries0)
+                        subForm.addButton(new ElementButton(headEntry.getName(), HeadRender.createButtonImage(headEntry.getTexture())));
+                    FormAPI.create(player, subForm, () -> {
+                        if(subForm.wasClosed()) {
+                            FormAPI.createLast(player, subPagesForm);
+                            return;
+                        }
+
+                        final HeadEntry headEntry = headEntries0.get(subForm.getResponse().getClickedButtonId());
+                        if(headEntry == null)
+                            return;
+                        this.giveItem(player, headEntry);
+                    });
+                });
+            });
+        } else if(headEntries.size() > pageCount) {
+            final FormWindowSimple pagesForm = new FormWindowSimple("§lSelect a page", "");
+            final List<List<HeadEntry>> pages = this.toPages(headEntries, pageCount);
             for(int i = 0; i < pages.size(); i++)
                 pagesForm.addButton(new ElementButton("Page " + (i + 1), HeadRender.createButtonImage(Iterables.getLast(pages.get(i)).getTexture())));
             FormAPI.create(player, pagesForm, () -> {
                 if(pagesForm.wasClosed()) {
-                    this.showForm(player);
+                    FormAPI.createLast(player, lastWindow);
                     return;
                 }
 
-                final List<HeadEntry> headEntries = pages.get(pagesForm.getResponse().getClickedButtonId());
-                if(headEntries == null)
+                final List<HeadEntry> headEntries0 = pages.get(pagesForm.getResponse().getClickedButtonId());
+                if(headEntries0 == null)
                     return;
-                final FormWindowSimple subForm = new FormWindowSimple(category.getDisplayName(), "");
-                for(final HeadEntry headEntry : headEntries)
+                final FormWindowSimple subForm = new FormWindowSimple(title, "");
+                for(final HeadEntry headEntry : headEntries0)
                     subForm.addButton(new ElementButton(headEntry.getName(), HeadRender.createButtonImage(headEntry.getTexture())));
                 FormAPI.create(player, subForm, () -> {
-                    if(subForm.wasClosed())
+                    if(subForm.wasClosed()) {
+                        FormAPI.createLast(player, pagesForm);
                         return;
-                    final HeadEntry headEntry = headEntries.get(subForm.getResponse().getClickedButtonId());
+                    }
+
+                    final HeadEntry headEntry = headEntries0.get(subForm.getResponse().getClickedButtonId());
                     if(headEntry == null)
                         return;
                     this.giveItem(player, headEntry);
                 });
             });
-        });
+        } else {
+            final FormWindowSimple subForm = new FormWindowSimple(title, "");
+            for(final HeadEntry headEntry : headEntries)
+                subForm.addButton(new ElementButton(headEntry.getName(), HeadRender.createButtonImage(headEntry.getTexture())));
+            FormAPI.create(player, subForm, () -> {
+                if(subForm.wasClosed()) {
+                    FormAPI.createLast(player, lastWindow);
+                    return;
+                }
+
+                final HeadEntry headEntry = headEntries.get(subForm.getResponse().getClickedButtonId());
+                if(headEntry == null)
+                    return;
+                this.giveItem(player, headEntry);
+            });
+        }
     }
 
     public void giveItem(Player player, HeadEntry headEntry) {

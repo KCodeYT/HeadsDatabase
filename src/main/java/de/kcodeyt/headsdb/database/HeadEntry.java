@@ -12,5 +12,6 @@ public class HeadEntry {
     private final String name;
     private final String id;
     private final String texture;
+    private final String tags;
 
 }

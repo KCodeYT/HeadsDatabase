@@ -12,8 +12,16 @@ public class HeadRender {
         return URL + SkinAPI.fromBase64(texture).substring(Mojang.TEXTURES.length()) + ".png";
     }
 
+    private static String createUrlById(String textureId) {
+        return URL + textureId + ".png";
+    }
+
     public static ElementButtonImageData createButtonImage(String texture) {
         return new ElementButtonImageData(ElementButtonImageData.IMAGE_DATA_TYPE_URL, HeadRender.createUrl(texture));
+    }
+
+    public static ElementButtonImageData createButtonImageById(String textureId) {
+        return new ElementButtonImageData(ElementButtonImageData.IMAGE_DATA_TYPE_URL, HeadRender.createUrlById(textureId));
     }
 
 }

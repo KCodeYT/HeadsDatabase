@@ -7,6 +7,7 @@ import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerFormRespondedEvent;
 import cn.nukkit.event.player.PlayerQuitEvent;
 import cn.nukkit.form.window.FormWindow;
+import cn.nukkit.plugin.Plugin;
 import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.scheduler.TaskHandler;
 import de.kcodeyt.headsdb.HeadsDB;
@@ -22,6 +23,11 @@ public class FormAPI {
 
     public static void create(Player player, FormWindow formWindow, Runnable onResponse) {
         new Handler(player, formWindow, onResponse);
+    }
+
+    public static void createLast(Player player, FormWindow formWindow) {
+        if(HANDLERS.containsKey(formWindow))
+            create(player, formWindow, HANDLERS.get(formWindow).runnable);
     }
 
     public static class FormListener implements Listener {
@@ -47,7 +53,7 @@ public class FormAPI {
         }
 
         private void handle(FormWindow formWindow, boolean isQuit) {
-            final Handler handler = HANDLERS.remove(formWindow);
+            final Handler handler = HANDLERS.get(formWindow);
             if(handler != null)
                 handler.handle(isQuit);
         }
@@ -69,11 +75,16 @@ public class FormAPI {
             if(!FormListener.INITIATED.get()) {
                 FormListener.INITIATED.set(true);
                 final PluginManager pluginManager = server.getPluginManager();
-                pluginManager.registerEvents(new FormListener(),
-                        pluginManager.getPlugins().values().stream().
-                                filter(plugin -> plugin instanceof HeadsDB).
-                                findAny().
-                                orElseThrow(RuntimeException::new));
+                Plugin found = null;
+                for(final Plugin plugin : pluginManager.getPlugins().values()) {
+                    if(plugin instanceof HeadsDB) {
+                        found = plugin;
+                        break;
+                    }
+                }
+
+                if(found != null)
+                    pluginManager.registerEvents(new FormListener(), found);
             }
         }
 

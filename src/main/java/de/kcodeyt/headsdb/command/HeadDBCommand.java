@@ -30,10 +30,16 @@ public class HeadDBCommand extends Command {
             switch(subCommand) {
                 case "reload":
                     if(sender.isOp()) {
-                        if(this.headsDB.getDatabase().reload())
-                            sender.sendMessage("§aReload the heads database successfully!");
-                        else
-                            sender.sendMessage("§cCould not reload the database!");
+                        sender.sendMessage("§7Reload the heads database...");
+                        this.headsDB.getDatabase().reload().whenComplete((result, error) -> {
+                            if(!result || error != null) {
+                                this.headsDB.getLogger().error("Could not load heads database!", error);
+                                sender.sendMessage("§cCould not reload the database!");
+                            } else {
+                                sender.sendMessage("§aSuccessfully reload the head database!");
+                                this.headsDB.getLogger().info("Successfully load " + this.headsDB.getDatabase().getHeadEntries().size() + " Heads!");
+                            }
+                        });
                         return true;
                     }
                     break;
