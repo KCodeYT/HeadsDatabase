@@ -86,10 +86,9 @@ public class Database {
                         try(final InputStream inputStream = connection.getInputStream();
                             final Reader reader = new InputStreamReader(inputStream)) {
                             final List<Map<String, String>> values = GSON.<List<Map<String, String>>>fromJson(reader, List.class);
-                            final List<HeadEntry> headEntries = values.stream().
-                                    map(map -> new HeadEntry(map.get("name"), map.get("uuid"), map.get("value"), map.get("tags"))).
-                                    sorted(Comparator.comparing(HeadEntry::getName)).
-                                    collect(Collectors.toList());
+                            final List<HeadEntry> headEntries = new ArrayList<>();
+                            for(Map<String, String> map : values)
+                                headEntries.add(new HeadEntry(map.get("name"), map.get("uuid"), map.get("value"), map.get("tags")));
                             localHeadEntries.addAll(headEntries);
                             localCategories.add(new Category(category, category.getDisplayName(), Iterables.getLast(headEntries).getTexture(), Collections.unmodifiableList(headEntries)));
                         }
