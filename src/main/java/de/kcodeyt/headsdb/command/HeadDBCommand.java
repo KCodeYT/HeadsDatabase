@@ -35,12 +35,16 @@ public class HeadDBCommand extends Command {
 
     public HeadDBCommand(HeadsDB headsDB) {
         super("hdb");
+        this.setPermission("headsdb.command.hdb");
         this.setAliases(new String[]{"headsdb"});
         this.headsDB = headsDB;
     }
 
     @Override
     public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+        if(!this.testPermission(sender))
+            return false;
+
         if(args.length > 0) {
             final String subCommand = args[0].toLowerCase();
             switch(subCommand) {
