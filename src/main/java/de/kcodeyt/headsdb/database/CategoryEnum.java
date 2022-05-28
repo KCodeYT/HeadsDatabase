@@ -16,6 +16,7 @@
 
 package de.kcodeyt.headsdb.database;
 
+import de.kcodeyt.headsdb.lang.TranslationKey;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -23,18 +24,19 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum CategoryEnum {
 
-    ALPHABET("Alphabet", "alphabet"),
-    ANIMALS("Animals", "animals"),
-    BLOCKS("Blocks", "blocks"),
-    DECORATION("Decoration", "decoration"),
-    FOOD_DRINKS("Food & Drinks", "food-drinks"),
-    HUMANS("Humans", "humans"),
-    HUMANOID("Humanoid", "humanoid"),
-    MISCELLANEOUS("Miscellaneous", "miscellaneous"),
-    MONSTERS("Monsters", "monsters"),
-    PLANTS("Plants", "plants");
+    ALPHABET(TranslationKey.CATEGORY_ALPHABET, TranslationKey.CATEGORY_ALPHABET_TITLE, "alphabet"),
+    ANIMALS(TranslationKey.CATEGORY_ANIMALS, TranslationKey.CATEGORY_ANIMALS_TITLE, "animals"),
+    BLOCKS(TranslationKey.CATEGORY_BLOCKS, TranslationKey.CATEGORY_BLOCKS_TITLE, "blocks"),
+    DECORATION(TranslationKey.CATEGORY_DECORATION, TranslationKey.CATEGORY_DECORATION_TITLE, "decoration"),
+    FOOD_DRINKS(TranslationKey.CATEGORY_FOOD_DRINKS, TranslationKey.CATEGORY_FOOD_DRINKS_TITLE, "food-drinks"),
+    HUMANS(TranslationKey.CATEGORY_HUMANS, TranslationKey.CATEGORY_HUMANS_TITLE, "humans"),
+    HUMANOID(TranslationKey.CATEGORY_HUMANOID, TranslationKey.CATEGORY_HUMANOID_TITLE, "humanoid"),
+    MISCELLANEOUS(TranslationKey.CATEGORY_MISCELLANEOUS, TranslationKey.CATEGORY_MISCELLANEOUS_TITLE, "miscellaneous"),
+    MONSTERS(TranslationKey.CATEGORY_MONSTERS, TranslationKey.CATEGORY_MONSTERS_TITLE, "monsters"),
+    PLANTS(TranslationKey.CATEGORY_PLANTS, TranslationKey.CATEGORY_PLANTS_TITLE, "plants");
 
-    private final String displayName;
+    private final TranslationKey buttonTranslationKey;
+    private final TranslationKey titleTranslationKey;
     private final String identifier;
 
 }

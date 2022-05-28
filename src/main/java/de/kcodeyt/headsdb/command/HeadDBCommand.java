@@ -23,8 +23,11 @@ import cn.nukkit.form.element.ElementSlider;
 import cn.nukkit.form.window.FormWindowCustom;
 import de.kcodeyt.headsdb.HeadsDB;
 import de.kcodeyt.headsdb.database.HeadEntry;
+import de.kcodeyt.headsdb.lang.Language;
+import de.kcodeyt.headsdb.lang.TranslationKey;
 import de.kcodeyt.headsdb.util.FormAPI;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
@@ -42,21 +45,31 @@ public class HeadDBCommand extends Command {
 
     @Override
     public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if(!this.testPermission(sender))
-            return false;
+        if(!this.testPermission(sender)) return false;
+
+        final Language language = this.headsDB.getLanguage();
 
         if(args.length > 0) {
             final String subCommand = args[0].toLowerCase();
             switch(subCommand) {
                 case "reload":
                     if(sender.isOp()) {
-                        sender.sendMessage("§7Reload the heads database...");
+                        sender.sendMessage(language.translate(sender instanceof Player ? (Player) sender : null, TranslationKey.DATABASE_RELOAD_START));
+
+                        try {
+                            this.headsDB.getLanguage().reload();
+                        } catch(IOException e) {
+                            this.headsDB.getLogger().error("Error while reloading language file", e);
+                            sender.sendMessage(language.translate(sender instanceof Player ? (Player) sender : null, TranslationKey.DATABASE_RELOAD_FAILED));
+                            return true;
+                        }
+
                         this.headsDB.getDatabase().reload().whenComplete((result, error) -> {
                             if(!result || error != null) {
                                 this.headsDB.getLogger().error("Could not load heads database!", error);
-                                sender.sendMessage("§cCould not reload the database!");
+                                sender.sendMessage(language.translate(sender instanceof Player ? (Player) sender : null, TranslationKey.DATABASE_RELOAD_FAILED));
                             } else {
-                                sender.sendMessage("§aSuccessfully reload the head database!");
+                                sender.sendMessage(language.translate(sender instanceof Player ? (Player) sender : null, TranslationKey.DATABASE_RELOAD_SUCCESS));
                                 this.headsDB.getLogger().info("Successfully load " + this.headsDB.getDatabase().getHeadEntries().size() + " Heads!");
                             }
                         });
@@ -65,8 +78,7 @@ public class HeadDBCommand extends Command {
                     break;
                 case "random":
                     if(sender.isOp()) {
-                        if(this.isConsole(sender))
-                            return false;
+                        if(this.isConsole(sender)) return false;
 
                         int amount;
                         try {
@@ -83,38 +95,37 @@ public class HeadDBCommand extends Command {
                         final Random random = ThreadLocalRandom.current();
                         for(int i = 0; i < amount; i++)
                             this.headsDB.getDatabase().giveItem((Player) sender, headEntries.get(random.nextInt(headEntries.size())));
+
+                        sender.sendMessage(language.translate((Player) sender, TranslationKey.GAVE_RANDOM_HEADS, amount));
                         return true;
                     }
                     break;
                 case "config":
-                    if(this.isConsole(sender))
-                        return false;
+                    if(this.isConsole(sender)) return false;
 
                     final Player player = (Player) sender;
-                    final FormWindowCustom configForm = new FormWindowCustom("Configure");
-                    configForm.addElement(new ElementSlider("Page length", 20, 120, 5, 40));
+                    final FormWindowCustom configForm = new FormWindowCustom(language.translate(player, TranslationKey.CONFIG_FORM_TITLE));
+                    configForm.addElement(new ElementSlider(language.translate(player, TranslationKey.CONFIG_FORM_PAGE_SIZE), 20, 120, 5, 40));
                     FormAPI.create(player, configForm, () -> {
-                        if(configForm.wasClosed())
-                            return;
+                        if(configForm.wasClosed()) return;
+
                         final int pageLength = (int) configForm.getResponse().getSliderResponse(0);
                         this.headsDB.getDatabase().getPageCount().put(player.getName(), pageLength);
-                        player.sendMessage("§aSet your page length to " + pageLength + "!");
+                        player.sendMessage(language.translate(player, TranslationKey.CONFIG_FORM_PAGE_SIZE_CHANGED, pageLength));
                     });
                     return true;
             }
         }
 
-        if(this.isConsole(sender))
-            return false;
+        if(this.isConsole(sender)) return false;
 
         this.headsDB.getDatabase().showForm((Player) sender);
         return true;
     }
 
     private boolean isConsole(CommandSender sender) {
-        if(sender instanceof Player)
-            return false;
-        sender.sendMessage("You must be logged in, to be able to use this command!");
+        if(sender instanceof Player) return false;
+        sender.sendMessage(this.headsDB.getLanguage().translate(null, TranslationKey.CONSOLE_USES_PLAYER_COMMAND));
         return true;
     }
 

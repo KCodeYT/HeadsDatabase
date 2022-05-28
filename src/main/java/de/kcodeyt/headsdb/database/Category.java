@@ -16,20 +16,15 @@
 
 package de.kcodeyt.headsdb.database;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.ToString;
+import lombok.Value;
 
 import java.util.List;
 
-@Getter
-@ToString
-@RequiredArgsConstructor
+@Value
 class Category {
 
-    private final CategoryEnum categoryEnum;
-    private final String displayName;
-    private final String displaySkin;
-    private final List<HeadEntry> entries;
+    CategoryEnum categoryEnum;
+    String displaySkin;
+    List<HeadEntry> entries;
 
 }
