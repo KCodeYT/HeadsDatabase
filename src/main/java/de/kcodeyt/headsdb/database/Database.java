@@ -28,8 +28,11 @@ import com.google.common.collect.Iterables;
 import com.google.gson.Gson;
 import de.kcodeyt.heads.Heads;
 import de.kcodeyt.heads.util.HeadInput;
+import de.kcodeyt.heads.util.PluginHolder;
 import de.kcodeyt.heads.util.ScheduledFuture;
 import de.kcodeyt.headsdb.HeadsDB;
+import de.kcodeyt.headsdb.lang.Language;
+import de.kcodeyt.headsdb.lang.TranslationKey;
 import de.kcodeyt.headsdb.util.FormAPI;
 import de.kcodeyt.headsdb.util.HeadRender;
 import lombok.Getter;
@@ -41,7 +44,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CompletionException;
-import java.util.stream.Collectors;
 
 @Getter
 public class Database {
@@ -49,12 +51,14 @@ public class Database {
     private static final String API_URL = "https://minecraft-heads.com/scripts/api.php";
     private static final Gson GSON = new Gson();
 
+    private final HeadsDB headsDB;
     private final Map<String, Integer> pageCount;
     private final List<Category> categories;
     private final List<HeadEntry> headEntries;
     private ScheduledFuture<Boolean> loadFuture;
 
-    public Database() {
+    public Database(HeadsDB headsDB) {
+        this.headsDB = headsDB;
         this.pageCount = new HashMap<>();
         this.categories = new ArrayList<>();
         this.headEntries = new ArrayList<>();
@@ -71,8 +75,8 @@ public class Database {
     }
 
     private ScheduledFuture<Boolean> load(boolean clear) {
-        if(this.loadFuture != null)
-            return this.loadFuture;
+        if(this.loadFuture != null) return this.loadFuture;
+
         final List<HeadEntry> localHeadEntries = new ArrayList<>();
         final List<Category> localCategories = new ArrayList<>();
         return this.loadFuture = ScheduledFuture.supplyAsync(() -> {
@@ -90,7 +94,7 @@ public class Database {
                             for(Map<String, String> map : values)
                                 headEntries.add(new HeadEntry(map.get("name"), map.get("uuid"), map.get("value"), map.get("tags")));
                             localHeadEntries.addAll(headEntries);
-                            localCategories.add(new Category(category, category.getDisplayName(), Iterables.getLast(headEntries).getTexture(), Collections.unmodifiableList(headEntries)));
+                            localCategories.add(new Category(category, Iterables.getLast(headEntries).getTexture(), Collections.unmodifiableList(headEntries)));
                         }
                     }
 
@@ -127,18 +131,20 @@ public class Database {
     }
 
     public void showForm(Player player) {
-        final FormWindowSimple categoriesForm = new FormWindowSimple("§lSelect a category", "");
+        final Language language = this.headsDB.getLanguage();
+
+        final FormWindowSimple categoriesForm = new FormWindowSimple(language.translate(player, TranslationKey.DATABASE_FORM_TITLE), "");
         final List<Category> categories = Collections.unmodifiableList(new ArrayList<>(this.categories));
-        categoriesForm.addButton(new ElementButton("Search a head", HeadRender.createButtonImageById(HeadsDB.MHF_QUESTION_TEXTURE_ID)));
+        categoriesForm.addButton(new ElementButton(language.translate(player, TranslationKey.DATABASE_FORM_SEARCH_HEAD), HeadRender.createButtonImageById(HeadsDB.MHF_QUESTION_TEXTURE_ID)));
         for(final Category category : categories)
-            categoriesForm.addButton(new ElementButton(category.getDisplayName(), HeadRender.createButtonImage(category.getDisplaySkin())));
+            categoriesForm.addButton(new ElementButton(language.translate(player, category.getCategoryEnum().getButtonTranslationKey()), HeadRender.createButtonImage(category.getDisplaySkin())));
         FormAPI.create(player, categoriesForm, () -> {
             if(categoriesForm.wasClosed())
                 return;
 
             if(categoriesForm.getResponse().getClickedButtonId() == 0) {
-                final FormWindowCustom searchForm = new FormWindowCustom("§lSearch a head");
-                searchForm.addElement(new ElementInput("Search head..."));
+                final FormWindowCustom searchForm = new FormWindowCustom(language.translate(player, TranslationKey.SEARCH_HEAD_FORM_TITLE));
+                searchForm.addElement(new ElementInput(language.translate(player, TranslationKey.SEARCH_HEAD_FORM_INPUT_FIELD)));
                 FormAPI.create(player, searchForm, () -> {
                     if(searchForm.wasClosed()) {
                         FormAPI.createLast(player, categoriesForm);
@@ -147,7 +153,7 @@ public class Database {
 
                     final String searchInput = TextFormat.clean(Objects.toString(searchForm.getResponse().getInputResponse(0), "")).trim();
                     if(searchInput.isEmpty()) {
-                        player.sendMessage("§cCould not search with empty search input!");
+                        player.sendMessage(language.translate(player, TranslationKey.SEARCH_HEAD_FORM_FAILED_EMPTY));
                         return;
                     }
 
@@ -176,34 +182,36 @@ public class Database {
                         }
                     }
 
-                    this.showForm(player, searchForm, foundEntries, "§lSearch: " + searchInput);
+                    this.showForm(player, searchForm, foundEntries, language.translate(player, TranslationKey.SEARCH_HEAD_SEARCHING_FORM_TITLE, searchInput));
                 });
             } else {
                 final Category category = categories.get(categoriesForm.getResponse().getClickedButtonId() - 1);
-                if(category == null)
-                    return;
-                this.showForm(player, categoriesForm, category.getEntries(), "§l" + category.getDisplayName());
+                if(category == null) return;
+
+                this.showForm(player, categoriesForm, category.getEntries(), language.translate(player, category.getCategoryEnum().getTitleTranslationKey()));
             }
         });
     }
 
     private void showForm(Player player, FormWindow lastWindow, List<HeadEntry> headEntries, String title) {
+        final Language language = this.headsDB.getLanguage();
+
         final int pageCount = this.pageCount.getOrDefault(player.getName(), 40);
         if(headEntries.size() > pageCount * pageCount) {
-            final FormWindowSimple pagesForm = new FormWindowSimple("§lSelect a page", "");
+            final FormWindowSimple pagesForm = new FormWindowSimple(language.translate(player, TranslationKey.SELECT_A_PAGE_TITLE), "");
             final List<List<List<HeadEntry>>> pages = this.toPages(this.toPages(headEntries, pageCount), pageCount);
             for(int i = 0; i < pages.size(); i++)
-                pagesForm.addButton(new ElementButton("Page " + (i + 1), HeadRender.createButtonImage(Iterables.getLast(Iterables.getLast(pages.get(i))).getTexture())));
+                pagesForm.addButton(new ElementButton(language.translate(player, TranslationKey.PAGE_BUTTON, (i + 1)), HeadRender.createButtonImage(Iterables.getLast(Iterables.getLast(pages.get(i))).getTexture())));
             FormAPI.create(player, pagesForm, () -> {
                 if(pagesForm.wasClosed()) {
                     FormAPI.createLast(player, lastWindow);
                     return;
                 }
 
-                final FormWindowSimple subPagesForm = new FormWindowSimple("§lSelect a subpage", "");
+                final FormWindowSimple subPagesForm = new FormWindowSimple(language.translate(player, TranslationKey.SELECT_SUB_PAGE_TITLE), "");
                 final List<List<HeadEntry>> subPages = pages.get(pagesForm.getResponse().getClickedButtonId());
                 for(int i = 0; i < subPages.size(); i++)
-                    subPagesForm.addButton(new ElementButton("Subpage " + (i + 1), HeadRender.createButtonImage(Iterables.getLast(subPages.get(i)).getTexture())));
+                    subPagesForm.addButton(new ElementButton(language.translate(player, TranslationKey.SUB_PAGE_BUTTON, (i + 1)), HeadRender.createButtonImage(Iterables.getLast(subPages.get(i)).getTexture())));
                 FormAPI.create(player, subPagesForm, () -> {
                     if(subPagesForm.wasClosed()) {
                         FormAPI.createLast(player, pagesForm);
@@ -211,8 +219,8 @@ public class Database {
                     }
 
                     final List<HeadEntry> headEntries0 = subPages.get(subPagesForm.getResponse().getClickedButtonId());
-                    if(headEntries0 == null)
-                        return;
+                    if(headEntries0 == null) return;
+
                     final FormWindowSimple subForm = new FormWindowSimple(title, "");
                     for(final HeadEntry headEntry : headEntries0)
                         subForm.addButton(new ElementButton(headEntry.getName(), HeadRender.createButtonImage(headEntry.getTexture())));
@@ -223,17 +231,17 @@ public class Database {
                         }
 
                         final HeadEntry headEntry = headEntries0.get(subForm.getResponse().getClickedButtonId());
-                        if(headEntry == null)
-                            return;
+                        if(headEntry == null) return;
+
                         this.giveItem(player, headEntry);
                     });
                 });
             });
         } else if(headEntries.size() > pageCount) {
-            final FormWindowSimple pagesForm = new FormWindowSimple("§lSelect a page", "");
+            final FormWindowSimple pagesForm = new FormWindowSimple(language.translate(player, TranslationKey.SELECT_A_PAGE_TITLE), "");
             final List<List<HeadEntry>> pages = this.toPages(headEntries, pageCount);
             for(int i = 0; i < pages.size(); i++)
-                pagesForm.addButton(new ElementButton("Page " + (i + 1), HeadRender.createButtonImage(Iterables.getLast(pages.get(i)).getTexture())));
+                pagesForm.addButton(new ElementButton(language.translate(player, TranslationKey.PAGE_BUTTON, (i + 1)), HeadRender.createButtonImage(Iterables.getLast(pages.get(i)).getTexture())));
             FormAPI.create(player, pagesForm, () -> {
                 if(pagesForm.wasClosed()) {
                     FormAPI.createLast(player, lastWindow);
@@ -241,8 +249,8 @@ public class Database {
                 }
 
                 final List<HeadEntry> headEntries0 = pages.get(pagesForm.getResponse().getClickedButtonId());
-                if(headEntries0 == null)
-                    return;
+                if(headEntries0 == null) return;
+
                 final FormWindowSimple subForm = new FormWindowSimple(title, "");
                 for(final HeadEntry headEntry : headEntries0)
                     subForm.addButton(new ElementButton(headEntry.getName(), HeadRender.createButtonImage(headEntry.getTexture())));
@@ -253,8 +261,8 @@ public class Database {
                     }
 
                     final HeadEntry headEntry = headEntries0.get(subForm.getResponse().getClickedButtonId());
-                    if(headEntry == null)
-                        return;
+                    if(headEntry == null) return;
+
                     this.giveItem(player, headEntry);
                 });
             });
@@ -269,8 +277,8 @@ public class Database {
                 }
 
                 final HeadEntry headEntry = headEntries.get(subForm.getResponse().getClickedButtonId());
-                if(headEntry == null)
-                    return;
+                if(headEntry == null) return;
+
                 this.giveItem(player, headEntry);
             });
         }
@@ -292,7 +300,7 @@ public class Database {
                     player.getLevel().dropItem(player, drop);
             }
 
-            player.sendMessage("§aGave you the head " + headEntry.getName() + "§r§a!");
+            player.sendMessage(PluginHolder.get().getLanguage().translate(player, de.kcodeyt.heads.lang.TranslationKey.HEAD_GIVEN, headEntry.getName()));
         });
     }
 
