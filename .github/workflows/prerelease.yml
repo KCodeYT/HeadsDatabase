@@ -2,7 +2,7 @@ name: Release this plugin
 
 on:
   push:
-    branches: [ release ]
+    branches: [ pr/2.0-compatibility ]
 
 jobs:
   build:
@@ -46,16 +46,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
-      - name: Create Release
+      - name: Create Pre-Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
         with:
+          prerelease: true
           tag_name: ${{env.VER}}
           release_name: HeadsDatabase v${{env.VER}}
 
-      - name: Upload plugin as release
+      - name: Upload plugin as pre release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
