@@ -22,7 +22,7 @@ jobs:
         uses: sudosubin/git-clone-action@v1.0.1
         with:
           repository: KCodeYT/Heads
-          ref: release
+          ref: next/2.0
           path: Heads
 
       - name: Install HeadsDatabasePlugin
