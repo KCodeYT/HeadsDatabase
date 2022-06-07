@@ -26,8 +26,8 @@ import cn.nukkit.item.Item;
 import cn.nukkit.utils.TextFormat;
 import com.google.common.collect.Iterables;
 import com.google.gson.Gson;
-import de.kcodeyt.heads.Heads;
-import de.kcodeyt.heads.util.HeadInput;
+import de.kcodeyt.heads.api.HeadAPI;
+import de.kcodeyt.heads.api.SkullOwnerResolveMethod;
 import de.kcodeyt.heads.util.PluginHolder;
 import de.kcodeyt.heads.util.ScheduledFuture;
 import de.kcodeyt.headsdb.HeadsDB;
@@ -285,14 +285,14 @@ public class Database {
     }
 
     public void giveItem(Player player, HeadEntry headEntry) {
-        Heads.createItem(HeadInput.ofTexture(headEntry.getTexture(), headEntry.getId())).whenComplete((result, throwable) -> {
+        HeadAPI.resolveSkullOwner(headEntry.getTexture(), SkullOwnerResolveMethod.TEXTURE).whenComplete((skullOwner, throwable) -> {
             if(throwable != null) {
-                player.sendMessage("§cCould not create the requested skull item!");
+                player.sendMessage(PluginHolder.get().getLanguage().translate(player, de.kcodeyt.heads.lang.TranslationKey.ERROR_WHILE_GIVING_HEAD));
                 throwable.printStackTrace();
                 return;
             }
 
-            final Item item = result.getItem();
+            final Item item = HeadAPI.createSkullItemByOwner(skullOwner);
             item.setCustomName("§r§7" + headEntry.getName());
             final Item[] drops = player.getInventory().addItem(item);
             if(drops.length > 0) {
