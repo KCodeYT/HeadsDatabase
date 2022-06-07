@@ -5,7 +5,7 @@ What is this?
 
 This project is an additional plugin for the Heads plugin. (Which can be
 found [here](https://github.com/KCodeYT/Heads/))
-This plugin adds a database to the Heads plugin so you can access more heads.
+This plugin adds a database to the Heads plugin, so you can access more heads.
 
 How can I download this plugin?
 ------------------------------
