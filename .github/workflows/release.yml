@@ -18,14 +18,14 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Clone HeadsDatabasePlugin
+      - name: Clone HeadsPlugin repository
         uses: sudosubin/git-clone-action@v1.0.1
         with:
           repository: KCodeYT/Heads
           ref: release
           path: Heads
 
-      - name: Install HeadsDatabasePlugin
+      - name: Install HeadsPlugin repository
         run: cd Heads && mvn install
 
       - name: Get name and version from pom.xml
